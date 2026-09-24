@@ -17,7 +17,7 @@
 <body <?php body_class($c('site')); ?>>
 <?php wp_body_open(); ?>
 <a class="<?php echo esc_attr($c('skip-link')); ?>" href="#main"><?php esc_html_e('Skip to content', 'mahout-render'); ?></a>
-<?php echo $header?->render(); // the host's chrome, escaped at its own outputs ?>
+<?php echo $header?->render(); // the host's chrome, escaped at its own outputs?>
 <main id="main" class="<?php echo esc_attr($c('main')); ?>">
 <?php if ($main instanceof Iniznet\Mahout\Render\Component) {
     echo $main->render();

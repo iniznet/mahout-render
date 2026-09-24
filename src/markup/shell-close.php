@@ -7,7 +7,7 @@
  */
 ?>
 </main>
-<?php echo $footer?->render(); // the host's chrome, escaped at its own outputs ?>
+<?php echo $footer?->render(); // the host's chrome, escaped at its own outputs?>
 <?php wp_footer(); ?>
 </body>
 </html>
