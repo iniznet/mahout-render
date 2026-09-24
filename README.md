@@ -1,29 +1,21 @@
-# mahout-assets
+# mahout-render
 
 ## What it is
 
-The build-manifest reader that turns a Vite build into WordPress script modules
-and stylesheets, with an explicit entry context. It owns asset resolution, the
-build manifest and the front, admin and editor entry contexts; it owns no theme,
-no content type and no storage.
+The render pipeline: a request's query context resolved to one Surface plan,
+the plan built through a builder whose every arm declares its cacheability,
+typed components rendered to HTML, fragments cached against content-derived
+keys, and the error boundary that turns a throwing Surface into a defined
+render. It owns resolution, the document shell, fragment caching and the
+response-header policy; it owns no content type, no field and no markup
+library.
 
 ## Installation
 
 There is no Packagist lane. Consume the repository over VCS and pin the major:
 
-```json
-{
-    "repositories": [
-        { "type": "vcs", "url": "https://github.com/iniznet/mahout-assets.git" }
-    ],
-    "require": {
-        "iniznet/mahout-assets": "^1.0"
-    }
-}
-```
-
 ```bash
-composer require iniznet/mahout-assets:^1.0
+composer require iniznet/mahout-render:^1.0
 ```
 
 A development checkout points at sibling directories through an uncommitted
@@ -35,104 +27,59 @@ A development checkout points at sibling directories through an uncommitted
 `src/Contracts/` is the package's entire public API. Everything under
 `src/Internal/` is `@internal` and may change in a patch release.
 
-| Interface | Role | Implementations |
-|---|---|---|
-| `ManifestSource` | where the build manifest lives: `path()`, `readable()`, `contents()` | `Internal\FileManifestSource` |
-| `AssetSize` | the transfer size of one built asset: `bytes()` | `Internal\GzipFileSize` |
+## The one path a request takes
 
-## Minimal usage
-
-The composition root declares an `AssetsConfig`, names `AssetsProvider`, and
-boots the kernel. Nothing is registered at file scope and nothing is read from
-the filesystem at construction.
+1. `QueryContext::current()` resolves the request's facts: the `QueryKind`,
+   the queried object id, the page var, the `SiteProfile`.
+2. The host's dispatch table matches the context to a plan with
+   `SurfacePlanBuilder`. An arm declares a Surface and one terminal — there is
+   no default and no terminal-less path:
 
 ```php
-<?php
+$plan = match (true) {
+    QueryKind::Embed === $ctx->kind => $builder
+        ->surface(static fn (): Component => new EmbedContent($ctx, $content))
+        ->uncacheable('embed document, rendered for one parent request'),
+    QueryKind::Singular === $ctx->kind => $builder
+        ->surface(static fn (): Component => new SinglePost($ctx, $content))
+        ->shared(FragmentKey::fromParts(['post', (string) $ctx->objectId])),
+    // …
+};
 
-declare(strict_types=1);
-
-use Iniznet\Mahout\Assets\AssetsConfig;
-use Iniznet\Mahout\Assets\AssetsProvider;
-use Iniznet\Mahout\Assets\DevMode;
-use Iniznet\Mahout\Assets\EntryList;
-use Iniznet\Mahout\Assets\Internal\FileManifestSource;
-use Iniznet\Mahout\Kernel\Kernel;
-
-$kernel = Kernel::inWordPress();
-
-$kernel->service(new AssetsConfig(
-    manifest: new FileManifestSource(get_theme_file_path('build/manifest.json')),
-    entries: EntryList::fromDeclarations([
-        [
-            'handle' => 'howdah-app',
-            'source' => 'src/front.ts',
-            'context' => 'front',
-            'dependencies' => ['@wordpress/interactivity'],
-            'domain' => 'howdah',
-            'translations_path' => get_theme_file_path('languages'),
-        ],
-    ]),
-    baseUrl: get_theme_file_uri('build'),
-    devMode: DevMode::fromConstant(),
-));
-
-$kernel->provider(AssetsProvider::class);
-$kernel->boot();
+// A listing arm past the content graph's last page is the same Surface,
+// uncacheable and stated:
+$builder->guardOverflow('beyond the last page the content graph holds')
+    ->shared(self::indexKey($ctx));
 ```
 
-An entry is enqueued by the context's core hook: `wp_enqueue_scripts` for
-`front`, `admin_enqueue_scripts` for `admin`, `enqueue_block_editor_assets`
-for `editor`. An entry that names no context is refused; there is no default.
+3. `shared($key)` is the `Cacheability::Shared` over `FragmentScope::Shared`
+   pair; `uncacheable($reason)` stores nothing and must say why;
+   `SurfacePlan::wrapped()` names class and scope for a plan that is neither.
+4. `Bootstrap::render()`-shaped hosts read the memoised plan, wrap the Surface
+   in the `SurfaceErrorBoundary`, and render.
 
-### Development mode
+## Components and the document shell
 
-Development mode is one explicit constant. Define it while developing:
+A component implements `Component`: `render(): string`. Two bases cover the
+common shapes — `MarkupComponent` for a class-resolved markup file, and plain
+composition components that return other components. `Document` is the page
+shell (header, main, footer); `Stack` composes children; `SiteProfile` carries
+the site's identity facts. `wp_head` and `wp_footer` fire inside the
+`Document` component and are never removed.
 
-```php
-define('MAHOUT_ASSETS_DEV', true);
-```
+## Fragment caching
 
-There is no network probe. When the constant is defined and true, a missing
-manifest throws; otherwise a missing manifest records a `warning` through
-`Diagnostics`, fires `mahout/assets/manifest_missing` and serves nothing.
+`FragmentCache` stores a rendered Surface under its `FragmentKey`. A key's
+parts must be enumerable from the site's own content graph — an anonymous
+visitor can invent nothing. `Cache\HeaderPolicy` and `Cache\ConditionalGet`
+emit the one `Cache-Control`/`Vary`/validator policy the pipeline owns; no
+other component may set those headers.
 
-### The build-time size gate
+## Failures are defined renders
 
-```bash
-composer budget:check
-```
-
-It measures every manifest entry's gzipped CSS and JavaScript against the
-per-route ceilings (50 KB and 60 KB by default) and exits non-zero on any entry
-over its ceiling.
-
-## Documented public concrete classes
-
-Every documented public class is part of the stable surface within a major.
-
-| Class | Role |
-|---|---|
-| `AssetsProvider` | the `ServiceProvider` that builds the enqueuer and attaches one action per context |
-| `AssetsConfig` | the manifest source, the entry list, the base URL and the dev-mode switch |
-| `EntryList` | the one explicit entry list, and the entries for a context |
-| `EntryPoint` | one declared entry: handle, manifest source, context, dependencies, translations |
-| `EntryContext` | the `Front` / `Admin` / `Editor` enum and the core hook each maps to |
-| `Manifest` | the parsed build manifest, resolving an entry to a URL and a version |
-| `ManifestEntry` | one parsed manifest record |
-| `ResolvedEntry` | one entry bound to its built module and stylesheets |
-| `ResolvedAsset` | one built asset's handle, file, URL and version |
-| `ScriptModuleTranslations` | the text domain and directory a module needs |
-| `DevMode` | the one development-mode switch, read from `MAHOUT_ASSETS_DEV` |
-| `AssetBudget` | the per-route CSS and JavaScript ceilings |
-| `BudgetCheck` | the build-time size check |
-| `BudgetVerdict` | the check's result: the breaches, or none |
-| `BudgetBreach` | one measured asset over its ceiling |
-| `Hooks` | every hook constant the package emits or observes |
-
-The package filters `mahout/assets/entries` and fires
-`mahout/assets/before_enqueue`, `mahout/assets/registered` and
-`mahout/assets/manifest_missing`. The generated reference is
-`docs/reference/hooks.md`.
+A Surface that throws is recorded through `Diagnostics` and rendered by
+`ErrorSurface` with status `500` in production; development rethrows. There is
+no white screen and no degraded mode — the error page is a defined render.
 
 ## Compatibility
 
@@ -140,19 +87,12 @@ The package filters `mahout/assets/entries` and fires
 |---|---|
 | PHP | 8.4 or later |
 | WordPress | 7.1 or later |
-| `Contracts/` | stable within a major version; a change is a contract change and is published as a major |
-| `Internal/` | unguaranteed; may change in a patch release |
+| `Contracts/` | stable within a major version |
 | Licence | GPL-2.0-or-later |
 
-## Architecture
-
-The package is framework-blind between the manifest and WordPress. `Manifest`
-parses JSON and computes URLs and versions; `EntryEnqueuer` is the only class
-that names a WordPress function. Every script module is registered through
-`wp_register_script_module()` and enqueued through `wp_enqueue_script_module()`;
-stylesheets are enqueued through `wp_enqueue_style()`. There is no
-`script_loader_tag` filter and no inline script or style.
+The decisions this package made are recorded under `docs/decisions/`; the
+discipline contract is `AGENTS.md`.
 
 ## Licence
 
-GPL-2.0-or-later. See [LICENSE](./LICENSE).
+GPL-2.0-or-later. The full text is in [LICENSE](./LICENSE).
