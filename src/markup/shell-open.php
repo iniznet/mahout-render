@@ -1,9 +1,10 @@
 <?php
 /**
- * The shell's opening half. One head, one skip link, one main landmark.
+ * The shell's opening half. One head, one skip link, one header, one main landmark.
  *
  * @var Iniznet\Mahout\Render\ClassNameResolver $c
  * @var Iniznet\Mahout\Render\Component|null    $main
+ * @var Iniznet\Mahout\Render\Component|null    $header
  */
 ?>
 <!doctype html>
@@ -16,8 +17,8 @@
 <body <?php body_class($c('site')); ?>>
 <?php wp_body_open(); ?>
 <a class="<?php echo esc_attr($c('skip-link')); ?>" href="#main"><?php esc_html_e('Skip to content', 'mahout-render'); ?></a>
+<?php echo $header?->render(); // the host's chrome, escaped at its own outputs ?>
 <main id="main" class="<?php echo esc_attr($c('main')); ?>">
-	<h1 class="<?php echo esc_attr($c('document-title')); ?>"><?php echo esc_html(wp_get_document_title()); ?></h1>
 <?php if ($main instanceof Iniznet\Mahout\Render\Component) {
     echo $main->render();
 } // the Surface's own escaped bytes?>
