@@ -55,11 +55,14 @@
             "@format:check",
             "@stan",
             "@psalm",
-            "@arch",
             "@rector",
             "@test",
+            "@hooks:check",
+            "@i18n:check",
             "@doctor",
             "@config:check"
         ]
-    }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
 }
