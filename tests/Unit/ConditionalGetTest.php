@@ -23,6 +23,8 @@ final class ConditionalGetTest extends TestCase
 {
     private const string KEY_PART = 'Iniznet\\Mahout\\Render\\Tests\\ConditionalGetSurface';
 
+    private const int SALT = 3;
+
     protected function tearDown(): void
     {
         \remove_all_filters('status_header');
@@ -37,7 +39,50 @@ final class ConditionalGetTest extends TestCase
         self::assertNotNull($validator);
         self::assertStringStartsWith('"', $validator);
         self::assertStringEndsWith('"', $validator);
-        self::assertSame('"'.\md5($this->key()->toString()).'"', $validator, 'the validator is the key digest, quoted.');
+        self::assertSame('"'.\md5($this->key()->toString().'|'.self::SALT).'"', $validator, 'the validator is the key and salt digest, quoted.');
+    }
+
+    public function testAnInvalidationRotatesTheValidator(): void
+    {
+        $before = $this->conditionalGet(Cacheability::Shared, $this->key(), null)->validator();
+
+        $after = new ConditionalGet(
+            HeaderPolicy::derive(Cacheability::Shared, 'GET', false),
+            $this->key(),
+            null,
+            self::SALT + 1,
+        )->validator();
+
+        self::assertNotNull($before);
+        self::assertNotNull($after);
+        self::assertNotSame($before, $after, 'an invalidation rotates the validator, so a held ETag is answered in full.');
+    }
+
+    public function testAWeakValidatorNeverStrongMatches(): void
+    {
+        $conditional = $this->conditionalGet(Cacheability::Shared, $this->key(), 'W/'.$this->etag());
+
+        self::captureStatusHeader($code);
+        self::assertFalse($conditional->answerNotModified(), 'a weak validator is a different representation.');
+        self::assertNull($code);
+    }
+
+    public function testAStarMatchesAnyRepresentationTheOriginHolds(): void
+    {
+        $conditional = $this->conditionalGet(Cacheability::Shared, $this->key(), '*');
+
+        self::captureStatusHeader($code);
+        self::assertTrue($conditional->answerNotModified());
+        self::assertSame(304, $code);
+    }
+
+    public function testOneMatchingTagInTheListIsAnsweredThreeZeroFour(): void
+    {
+        $conditional = $this->conditionalGet(Cacheability::Shared, $this->key(), '"stale", '.$this->etag());
+
+        self::captureStatusHeader($code);
+        self::assertTrue($conditional->answerNotModified());
+        self::assertSame(304, $code);
     }
 
     public function testTwoVisitorsOnOneKeyReceiveOneValidator(): void
@@ -107,6 +152,7 @@ final class ConditionalGetTest extends TestCase
             HeaderPolicy::derive($class, 'GET', false),
             $key,
             $ifNoneMatch,
+            self::SALT,
         );
     }
 

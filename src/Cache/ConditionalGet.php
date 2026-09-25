@@ -31,16 +31,19 @@ final readonly class ConditionalGet
         private HeaderPolicy $policy,
         private ?FragmentKey $key,
         private ?string $ifNoneMatch,
+        private int $salt,
     ) {
     }
 
     /**
      * The response's own validator, or null when it states none.
      *
-     * The digest is of the fragment key and never of the body: the key is
-     * already the enumerable statement of the content graph the bytes came from,
-     * so naming it needs no output buffering, and two visitors on one key
-     * receive one validator.
+     * The digest is of the fragment key and of the group's invalidation salt,
+     * and never of the body: the key is the enumerable statement of the
+     * content graph the bytes came from, the salt is the invalidation state
+     * that rotates under it, and together they change exactly when the stored
+     * representation can. Naming them needs no output buffering, and two
+     * visitors on one key and one salt receive one validator.
      */
     public function validator(): ?string
     {
@@ -48,13 +51,17 @@ final readonly class ConditionalGet
             return null;
         }
 
-        return '"'.\md5($this->key->toString()).'"';
+        return '"'.\md5($this->key->toString().'|'.$this->salt).'"';
     }
 
     /**
      * Whether this request already holds the response. When it does, the `304`
      * is emitted here and true is returned: the response is complete, and the
      * caller must send no body.
+     *
+     * The header's comparison follows RFC 9110: the field is a comma-separated
+     * list, a star matches any representation the origin currently holds, and
+     * a weak validator never strong-matches.
      */
     public function answerNotModified(): bool
     {
@@ -64,12 +71,33 @@ final readonly class ConditionalGet
             return false;
         }
 
-        if (!\str_contains($this->ifNoneMatch, $validator)) {
+        if (!$this->matches($validator)) {
             return false;
         }
 
         \status_header(304);
 
         return true;
+    }
+
+    private function matches(string $validator): bool
+    {
+        foreach (\explode(',', $this->ifNoneMatch ?? '') as $tag) {
+            $tag = \trim($tag);
+
+            if ('*' === $tag) {
+                return true;
+            }
+
+            if (\str_starts_with($tag, 'W/')) {
+                continue;
+            }
+
+            if ($tag === $validator) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

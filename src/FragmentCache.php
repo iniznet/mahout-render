@@ -23,7 +23,8 @@ namespace Iniznet\Mahout\Render;
 
 final class FragmentCache
 {
-    public const string GROUP = 'howdah/fragments';
+    /** The group is the library's namespace: a theme's name never leaks into it. */
+    public const string GROUP = 'mahout/render/fragments';
     public const int TTL_SECONDS = 300;
 
     private const string LOCK_SUFFIX = '|lock';
