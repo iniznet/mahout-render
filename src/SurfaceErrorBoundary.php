@@ -3,7 +3,7 @@
 /**
  * The render boundary. A Surface returns the page's HTML or throws; the
  * boundary catches the throw, records it at critical through Diagnostics,
- * fires howdah/surface/failed, and — in production only — renders the Error
+ * fires `Hooks::SURFACE_FAILED`, and — in production only — renders the Error
  * Surface with status 500. In development it rethrows: development sees the
  * trace, production sees the defined page. No white screen, no substitute
  * data, no degraded mode.

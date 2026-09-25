@@ -8,6 +8,9 @@
  *
  * The plan carries the wrapped component or the bare one, never both: the
  * wrap happens here, in one construction site, so it is greppable in one file.
+ * The constructor is private — the two named terminals, `uncacheable()` and
+ * `wrapped()`, are the only paths to a plan, so no arm inherits a default and
+ * no Uncacheable plan exists without its stated reason.
  */
 
 declare(strict_types=1);
@@ -18,7 +21,7 @@ use Iniznet\Mahout\Render\Exception\UncacheableWithoutReason;
 
 final readonly class SurfacePlan
 {
-    public function __construct(
+    private function __construct(
         public Component $surface,
         public Cacheability $cacheability,
         public FragmentScope $fragmentScope,

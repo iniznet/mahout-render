@@ -359,14 +359,13 @@ No coverage target. Coverage rewards testing getters.
 
 ## This package's section
 
-`mahout-assets` implements the contract above. It records the following, and
+`mahout-render` implements the contract above. It records the following, and
 only the following, deviations. Each is an ADR, not an edit to the contract.
 
 | Deviation | Why | ADR |
 |---|---|---|
-| Entry contexts are an enum with a `hook()` method rather than three provider methods | One closed set and one mapping, greppable from the enum; a test asserts each case's core hook | 0001 |
-| `AssetsProvider` resolves an `AssetsConfig` service from the container rather than reading a config file | The kernel instantiates a provider with no arguments; the composition root declares the config, so the dependency stays explicit and traceable | 0001 |
-| The manifest is read through a `ManifestSource` contract and asset sizes through an `AssetSize` contract | It keeps the filesystem behind one boundary and makes the missing-manifest and budget behaviours provable without a build | 0002 |
+| `QueryContext::current()` is the one `$wp_query` read and the one site read in the codebase, reached statically | The request facts are ambient by nature; one boundary read makes every other use site a typed value | 0001 |
+| `SurfaceErrorBoundary` emits `mahout/render/surface_failed` though it is neither a Provider nor a Module | The failure happens inside the render, after the record exists and before the defined page is chosen; the boundary is the one class that holds both | 0002 |
 | `composer stan` and `composer arch` run the same shared PHPStan config | A consumer's root config must include the shared one, which already carries the rules | 0003 |
 | The committed `composer.lock` is resolved through the uncommitted path repository | `mahout-devtools` is not published yet, and REP-11 forbids a committed `path` repository | 0003 |
 
@@ -379,16 +378,13 @@ service locator reached for statically, no trait, no dynamic property, no
 
 | Must have a test |
 |---|
-| Every declared entry resolving to a URL and a version |
-| Each entry context enqueuing on its own core hook and never on another's |
-| An entry declaration without a context failing, and an unknown context failing |
-| An entry registering through `wp_register_script_module()` and enqueuing through `wp_enqueue_script_module()` |
-| No `script_loader_tag` or `wp_script_attributes` filter anywhere in the repository |
-| A non-default script module domain receiving `wp_set_script_module_translations()` after registration, and `default` not |
-| The `mahout/assets/entries` filter receiving the list and the context, and an added admin entry enqueuing |
-| A missing manifest failing loudly in development and recording a warning and serving nothing in production |
-| Development mode reading one constant, and no production file probing the network |
-| The build-time size check failing on an over-budget fixture |
+| The conditional GET's validator: present on a stored Shared response, absent on an Uncacheable one or a plan that wraps no fragment |
+| The validator digests the key and the invalidation salt together, and an invalidation rotates it |
+| The `If-None-Match` comparison: a matching list entry, a star, a weak validator never strong-matching |
+| An `Uncacheable` plan refusing an empty reason, and the two terminals as the only paths to a plan |
+| Every declared dispatch arm's `Cacheability` and `FragmentScope`, and a stated reason on every `Uncacheable` arm |
+| The Error Surface rendering the support reference, and production answering 500 while development rethrows |
+| The per-component rendered output: `Document`, `EmbedDocument`, `ErrorSurface` |
 
 ---
 
