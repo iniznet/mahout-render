@@ -367,7 +367,6 @@ only the following, deviations. Each is an ADR, not an edit to the contract.
 | `QueryContext::current()` is the one `$wp_query` read and the one site read in the codebase, reached statically | The request facts are ambient by nature; one boundary read makes every other use site a typed value | 0001 |
 | `SurfaceErrorBoundary` emits `mahout/render/surface_failed` though it is neither a Provider nor a Module | The failure happens inside the render, after the record exists and before the defined page is chosen; the boundary is the one class that holds both | 0002 |
 | `composer stan` and `composer arch` run the same shared PHPStan config | A consumer's root config must include the shared one, which already carries the rules | 0003 |
-| The committed `composer.lock` is resolved through the uncommitted path repository | `mahout-devtools` is not published yet, and REP-11 forbids a committed `path` repository | 0003 |
 
 No other rule in this document is relaxed. In particular: no reflection, no
 service locator reached for statically, no trait, no dynamic property, no
