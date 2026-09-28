@@ -37,7 +37,6 @@
             "Iniznet\\Mahout\\Render\\Tests\\": "tests/"
         }
     },
-    "extra": {},
     "config": {
         "sort-packages": true,
         "optimize-autoloader": true,
